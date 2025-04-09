@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D FBXビューアー</title>
+    <style>
+        body { margin: 0; overflow: hidden; }
+        canvas { display: block; }
+        #info {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            color: white;
+            background-color: rgba(0,0,0,0.5);
+            padding: 5px;
+        }
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            background-color: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="info">FBXビューアー - マウス操作：回転（ドラッグ）、ズーム（スクロール）</div>
+    <div id="loading">モデル読み込み中...</div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dat-gui/0.7.7/dat.gui.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/FBXLoader.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/fflate.min.js"></script>
+
+    <script>
+        // 主要な変数
+        let scene, camera, renderer, controls, model;
+        const modelPath = './model.fbx'; // FBXファイルのパス（実際のファイルに置き換えてください）
+
+        // 初期化関数
+        function init() {
+            // シーンの作成
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x333333);
+
+            // カメラの設定
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+            camera.position.set(0, 100, 200);
+
+            // レンダラーの設定
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.shadowMap.enabled = true;
+            document.body.appendChild(renderer.domElement);
+
+            // OrbitControlsの設定（回転やズーム機能）
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.screenSpacePanning = false;
+            controls.minDistance = 50;
+            controls.maxDistance = 500;
+            controls.maxPolarAngle = Math.PI / 2;
+
+            // ライトの追加
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(1, 1, 1);
+            directionalLight.castShadow = true;
+            scene.add(directionalLight);
+
+            // グリッドヘルパーの追加
+            const gridHelper = new THREE.GridHelper(200, 20);
+            scene.add(gridHelper);
+
+            // FBXモデルの読み込み
+            loadModel();
+
+            // ウィンドウリサイズ対応
+            window.addEventListener('resize', onWindowResize);
+        }
+
+        // FBXモデル読み込み関数
+        function loadModel() {
+            const loadingElem = document.getElementById('loading');
+            loadingElem.style.display = 'block';
+
+            const loader = new THREE.FBXLoader();
+            
+            // モデル読み込み
+            loader.load(
+                modelPath,
+                function (object) {
+                    // 読み込み成功時の処理
+                    model = object;
+                    
+                    // モデルのスケール調整
+                    const box = new THREE.Box3().setFromObject(model);
+                    const size = box.getSize(new THREE.Vector3()).length();
+                    const scale = 100 / size;
+                    model.scale.set(scale, scale, scale);
+                    
+                    // モデルの位置調整
+                    box.setFromObject(model);
+                    const center = box.getCenter(new THREE.Vector3());
+                    model.position.x -= center.x;
+                    model.position.y -= center.y;
+                    model.position.z -= center.z;
+                    
+                    // シーンに追加
+                    scene.add(model);
+                    
+                    // 読み込み表示を非表示
+                    loadingElem.style.display = 'none';
+                },
+                function (xhr) {
+                    // 読み込み進捗の表示
+                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
+                },
+                function (error) {
+                    // エラー処理
+                    console.error('モデル読み込みエラー:', error);
+                    loadingElem.textContent = 'モデル読み込みエラー';
+                }
+            );
+        }
+
+        // ウィンドウリサイズ対応関数
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // アニメーションループ
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // アプリケーション開始
+        init();
+        animate();
+    </script>
+</body>
+</html>
